@@ -206,8 +206,9 @@
 
   <h2>Out of scope &amp; trade-offs</h2>
   <ul class="compact">
-    <li>Not implemented: DB persistence, idempotency replay, mapper logic, <code>start_date</code> in reconcile.</li>
-    <li>Trade-offs: extension-only <code>.csv</code> check · 10 MB in code · no email format validator · read-only.</li>
+    <li><strong>Writes:</strong> <code>EmployeeWriteRepository</code> is implemented (create, update, cohort add/remove). Confirm/apply from preview is <strong>not wired</strong> — orchestrator + staging are the remaining step.</li>
+    <li><strong>Still open:</strong> idempotency replay, mapper logic, <code>start_date</code> in reconcile.</li>
+    <li>Trade-offs: extension-only <code>.csv</code> check · 10 MB in code · no email format validator · preview is read-only.</li>
   </ul>
 
   <div class="footer">

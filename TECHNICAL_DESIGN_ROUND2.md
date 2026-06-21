@@ -123,11 +123,10 @@
 
 ---
 
-### Not in this implementation
+### Out of scope
 
-- Saving changes to the database  
-- Idempotency replay  
-- Mapper / `start_date` in reconcile  
+- **Writes:** `EmployeeWriteRepository` is implemented (create, update, cohort add/remove). Confirm/apply from preview is **not wired** — orchestrator + staging are the remaining step.
+- **Still open:** idempotency replay, mapper logic, `start_date` in reconcile.
 
 ---
 

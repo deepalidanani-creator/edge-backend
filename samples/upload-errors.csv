@@ -1,0 +1,5 @@
+employee_id,email,name,role,cohort_names,start_date
+emp-010,a@vantage.com,Alpha,EMPLOYEE,,2026-01-01
+emp-010,b@vantage.com,Beta Duplicate Id,EMPLOYEE,,2026-01-01
+emp-011,c@vantage.com,Charlie,EMPLOYEE,Does Not Exist,2026-01-01
+emp-001,changed@vantage.com,Jane Doe,EMPLOYEE,,2026-01-01

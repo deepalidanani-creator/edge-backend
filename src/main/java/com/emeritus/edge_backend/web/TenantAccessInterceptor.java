@@ -45,6 +45,7 @@ public class TenantAccessInterceptor implements HandlerInterceptor {
     private boolean requiresTenantHeader(String path) {
         return path.startsWith("/v1/sessions")
             || path.startsWith("/v1/employees")
-            || path.startsWith("/v1/tenants/");
+            || path.startsWith("/v1/tenants/")
+            || path.startsWith("/v1/upload/emp-with-cohort-assignment");
     }
 }

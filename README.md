@@ -70,7 +70,7 @@ All tests should pass (green build).
 test.bat
 ```
 
-**Expected:** `BUILD SUCCESS` — **22 tests**, 0 failures.
+**Expected:** `BUILD SUCCESS` — full suite (Round 1 + Round 2 upload), 0 failures.
 
 | Test class | What it verifies |
 |------------|------------------|
@@ -81,18 +81,28 @@ test.bat
 | `IdempotencyTests` | Same key returns original session; no duplicate event |
 | `EventPublicationTests` | Events on schedule, cancel, allocation update |
 | `InvitationReadTests` | Employee sees cohort + audience-all sessions correctly |
+| `FileUploadServiceReconciliationTests` | CSV reconcile: create/update, cohort diff, conflicts (unit) |
+| `FileUploadIntegrationTests` | Multipart upload end-to-end against H2 seed data |
+| `FileUploadControllerTests` | Upload auth guard (non-admin forbidden) |
 
 ### Manual API tests (curl)
 
 With the app running (`run.bat`), open a second terminal.
 
-Quick smoke test:
+Quick smoke test (Round 1):
 
 ```bat
 curl -i http://localhost:8080/v1/topics
 ```
 
-Full step-by-step curl for every endpoint, happy paths, and error cases — see **[CURL.md](CURL.md)**.
+| Guide | Scope |
+|-------|--------|
+| **[CURL.md](CURL.md)** | Round 1 — scheduling, allocations, idempotency, error cases |
+| **[CURL_ROUND2.md](CURL_ROUND2.md)** | Round 2 — employee/cohort CSV upload preview (happy + error paths) |
+
+Sample CSV files for Round 2 manual tests live in **[samples/](samples/)** (`upload-happy.csv`, `upload-update.csv`, `upload-errors.csv`).
+
+Round 2 design and reconciler rules → **[ROUND2_README.md](ROUND2_README.md)**.
 
 ## Auth assumption
 
@@ -247,6 +257,14 @@ Scheduling ends at “session exists, audience known, event published.” Runnin
 - Cancellation removes the session row only; `tenant_allocation.allocated_slots` is unchanged so the slot can be re-booked.
 - No structured request/audit logging or CI pipeline in this repository — intentional scope limit for the exercise.
 
+## Round 2 — Employee / cohort CSV upload (preview)
+
+L&D admins upload a CSV; the API parses and reconciles against tenant data **read-only** (no DB writes in Phase 1).
+
+- **Endpoint:** `POST /v1/upload/emp-with-cohort-assignment` (multipart `file`)
+- **Manual tests:** **[CURL_ROUND2.md](CURL_ROUND2.md)** + **[samples/](samples/)**
+- **Design / schema:** **[ROUND2_README.md](ROUND2_README.md)**, **[SCHEMA_ROUND2.md](SCHEMA_ROUND2.md)**
+
 ## Seed data (loaded automatically)
 
 | Tenant | Bucket | Max sessions |
@@ -257,14 +275,15 @@ Scheduling ends at “session exists, audience known, event published.” Runnin
 
 - 8 topics, 3 speakers (with speaker–topic mappings)
 - Sample employees: `emp-001`, `emp-002` (tenant `vantage-fi`)
+- Round 2: `tenant_cohort` catalog (4 cohort display names for `vantage-fi`)
 
 ## Required headers (tenant-scoped APIs)
 
 | Header | When required |
 |--------|----------------|
-| `X-Tenant-Id` | Sessions, employees, tenant allocations |
-| `X-User-Role` | `LND_ADMIN` for POST/PUT/DELETE write operations |
-| `Idempotency-Key` | `POST /v1/sessions` |
+| `X-Tenant-Id` | Sessions, employees, tenant allocations, CSV upload |
+| `X-User-Role` | `LND_ADMIN` for POST/PUT/DELETE write operations and CSV upload |
+| `Idempotency-Key` | `POST /v1/sessions`, `POST /v1/upload/emp-with-cohort-assignment` |
 
 ## H2 console (optional)
 
@@ -282,8 +301,12 @@ src/main/java/com/emeritus/edge_backend/
   event/        Domain event stubs
 src/test/java/  Automated tests
 src/main/resources/data.sql  Seed data
-CURL.md         Manual curl test commands
-SCHEMA.md       Data model reference
+samples/        Round 2 sample CSV files for manual upload tests
+CURL.md         Round 1 manual curl test commands
+CURL_ROUND2.md  Round 2 CSV upload curl test commands
+ROUND2_README.md  Round 2 design and implementation notes
+SCHEMA.md       Round 1 data model reference
+SCHEMA_ROUND2.md  Round 2 data model reference
 ```
 
 ## Troubleshooting

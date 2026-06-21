@@ -27,10 +27,14 @@ INSERT INTO tenant_bucket (tenant_id, bucket_type, max_limit) VALUES ('apex-edu'
 INSERT INTO tenant_bucket (tenant_id, bucket_type, max_limit) VALUES ('abc-edu', 'BUCKET_03', 8);
 
 -- 4. Employees and cohort memberships
-INSERT INTO employee (id, tenant_id) VALUES ('emp-001', 'vantage-fi');
+
+INSERT INTO employee (id, tenant_id, name, email_id, role)
+VALUES ('emp-001', 'vantage-fi', 'Jane Doe', 'jane@vantage.com', 'EMPLOYEE');
 INSERT INTO employee_cohorts (employee_id, cohort_id) VALUES ('emp-001', 'leadership-2026');
 INSERT INTO employee_cohorts (employee_id, cohort_id) VALUES ('emp-001', 'managers-q2');
-INSERT INTO employee (id, tenant_id) VALUES ('emp-002', 'vantage-fi');
+
+INSERT INTO employee (id, tenant_id, name, email_id, role)
+VALUES ('emp-002', 'vantage-fi', 'Alex Chen', 'alex@vantage.com', 'EMPLOYEE');
 INSERT INTO employee_cohorts (employee_id, cohort_id) VALUES ('emp-002', 'engineering');
 
 -- 5. Seed Allocation Capacity Limits (Requirement #1)
@@ -38,3 +42,9 @@ INSERT INTO employee_cohorts (employee_id, cohort_id) VALUES ('emp-002', 'engine
 INSERT INTO tenant_allocation (tenant_id, topic_id, allocated_slots) VALUES ('vantage-fi', 1, 2);
 -- Apex Education has allocated 1 total seat for the Remote Teams topic
 INSERT INTO tenant_allocation (tenant_id, topic_id, allocated_slots) VALUES ('apex-edu', 2, 1);
+
+-- 6. Tenant cohort catalog (id + display name for CSV cohort_names matching)
+INSERT INTO tenant_cohort (tenant_id, cohort_id, cohort_name) VALUES ('vantage-fi', 'leadership-2026', 'Senior Leadership');
+INSERT INTO tenant_cohort (tenant_id, cohort_id, cohort_name) VALUES ('vantage-fi', 'ai-capability-build', 'AI Capability Build');
+INSERT INTO tenant_cohort (tenant_id, cohort_id, cohort_name) VALUES ('vantage-fi', 'managers-q2', 'Managers Q2');
+INSERT INTO tenant_cohort (tenant_id, cohort_id, cohort_name) VALUES ('vantage-fi', 'engineering', 'Engineering');

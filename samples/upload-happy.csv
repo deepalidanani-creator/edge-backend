@@ -1,0 +1,4 @@
+employee_id,email,name,role,cohort_names,start_date
+emp-003,bob@vantage.com,Bob Smith,EMPLOYEE,,2026-01-15
+emp-001,jane@vantage.com,Jane Doe,EMPLOYEE,Senior Leadership;Managers Q2,2026-01-01
+emp-004,cara@vantage.com,Cara Lee,EMPLOYEE,AI Capability Build,2026-02-01

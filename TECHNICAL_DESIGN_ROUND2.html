@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Round 2 — Employee CSV Upload · Technical Design</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      color: #1a1a1a;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 12px 0 24px;
+    }
+    h1 {
+      font-size: 22pt;
+      font-weight: 600;
+      margin: 0 0 4px;
+      color: #0f2b4a;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      font-size: 13pt;
+      color: #4a5568;
+      margin: 0 0 6px;
+      font-weight: 500;
+    }
+    .lead {
+      background: #f0f4f8;
+      border-left: 4px solid #2563eb;
+      padding: 12px 14px;
+      margin: 16px 0 22px;
+      border-radius: 0 6px 6px 0;
+      font-size: 10.5pt;
+    }
+    h2 {
+      font-size: 12pt;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #2563eb;
+      margin: 22px 0 10px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #e2e8f0;
+      page-break-after: avoid;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 14px;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+    }
+    th {
+      background: #0f2b4a;
+      color: #fff;
+      text-align: left;
+      padding: 7px 10px;
+      font-weight: 600;
+    }
+    td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+    code, .mono {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9pt;
+      background: #f1f5f9;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    pre.flow {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 8.5pt;
+      line-height: 1.35;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      white-space: pre;
+      page-break-inside: avoid;
+    }
+    .footnote {
+      font-size: 8.5pt;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .muted { color: #64748b; }
+    ul.compact { margin: 6px 0; padding-left: 18px; }
+    ul.compact li { margin: 3px 0; }
+    .footer {
+      margin-top: 28px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 8.5pt;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Round 2 — Employee CSV Upload</h1>
+  <p class="subtitle">Technical Design · Implemented</p>
+
+  <div class="lead">
+    L&amp;D admin uploads a CSV. The API validates the file and each row, compares against tenant data,
+    and returns a <strong>preview</strong> of proposed changes. <strong>Nothing is written to the database.</strong>
+  </div>
+
+  <h2>At a glance</h2>
+  <table>
+    <tr><th style="width:28%">Item</th><th>Detail</th></tr>
+    <tr><td>Endpoint</td><td><code>POST /v1/upload/emp-with-cohort-assignment</code></td></tr>
+    <tr><td>Headers</td><td><code>X-Tenant-Id</code> · <code>X-User-Role: LND_ADMIN</code> · <code>Idempotency-Key</code><sup>1</sup></td></tr>
+    <tr><td>File</td><td><code>.csv</code>, max 10 MB, multipart field <code>file</code></td></tr>
+    <tr><td>All rows valid</td><td><code>200 OK</code> + full response</td></tr>
+    <tr><td>Some rows invalid</td><td><code>400</code> + full response (every row still listed)</td></tr>
+    <tr><td>File rejected</td><td><code>403</code> / <code>400</code> + <code>{ "error": "..." }</code></td></tr>
+  </table>
+  <p class="footnote"><sup>1</sup> Header required; not stored or replayed in current code.</p>
+  <p><strong>CSV columns:</strong> <code>employee_id</code>, <code>email</code>, <code>name</code>, optional <code>role</code>, optional <code>cohort_names</code> (semicolon-separated display names), optional <code>start_date</code> (parsed, not used in reconcile).</p>
+
+  <h2>Flow</h2>
+  <pre class="flow">  Upload CSV
+      │
+      ▼
+  ┌─────────────────────────┐
+  │ File checks (controller)│── fail ──▶ 403 / 400
+  │ role · empty · .csv · size │
+  └───────────┬─────────────┘
+              │ OK
+              ▼
+  ┌─────────────────────────┐
+  │ reconcileRows (service) │
+  │  Pass 1 — file rules    │  duplicates, required fields
+  │  Pass 2 — vs database   │  CREATE / UPDATE / cohort diff
+  └───────────┬─────────────┘     reads tenant_cohort + employee
+              ▼
+  JSON: valid · totalRows · rows[]
+  (category · operations · errors · parsed data per row)</pre>
+
+  <h2>Components</h2>
+  <table>
+    <tr><th>Layer</th><th>Class</th><th>Role</th></tr>
+    <tr><td>Security</td><td><code>TenantAccessInterceptor</code></td><td>Requires tenant header</td></tr>
+    <tr><td>Controller</td><td><code>FileUploadController</code></td><td>File validation, orchestration</td></tr>
+    <tr><td>Service</td><td><code>FileUploadService</code></td><td><code>parseCSV()</code> + <strong>reconcileRows()</strong></td></tr>
+    <tr><td>Data</td><td>Cohort + Employee repos</td><td>Read-only lookups</td></tr>
+    <tr><td>Types</td><td>DTOs, enums</td><td>Response shape</td></tr>
+  </table>
+  <p class="muted">Core: <code>reconcileRows()</code> — 18 unit tests + 7 integration tests.</p>
+
+  <h2>Database (read path)</h2>
+  <table>
+    <tr><th>Table</th><th>Change</th><th>Used for</th></tr>
+    <tr><td><code>tenant_cohort</code></td><td>New</td><td>Map cohort display names from CSV</td></tr>
+    <tr><td><code>employee</code></td><td>+ name, email_id, role</td><td>Compare / preview create-update</td></tr>
+    <tr><td><code>employee_cohorts</code></td><td>Unchanged</td><td>Membership diff</td></tr>
+  </table>
+  <p>Two reads per upload: all tenant cohorts + employees whose ids appear in the CSV.</p>
+
+  <h2>Validation</h2>
+  <p><strong>Whole file fails</strong> — wrong role (403); empty, bad extension, too large, parse error (400).</p>
+  <table>
+    <tr><th>Row error</th><th>Meaning</th></tr>
+    <tr><td><code>REQUIRED_FIELD_MISSING</code></td><td>Missing id, email, or name</td></tr>
+    <tr><td><code>DUPLICATE_EMPLOYEE</code></td><td>Same employee id twice in file</td></tr>
+    <tr><td><code>DUPLICATE_EMAIL</code></td><td>Same email twice in file</td></tr>
+    <tr><td><code>UNKNOWN_COHORT</code></td><td>Cohort name not in tenant catalog</td></tr>
+    <tr><td><code>ORPHAN_COHORT_MEMBERSHIP</code></td><td>DB cohort id missing from catalog</td></tr>
+    <tr><td><code>EMAIL_CONFLICT</code></td><td>Email change blocked for existing employee</td></tr>
+  </table>
+
+  <h2>Reconcile outcomes</h2>
+  <table>
+    <tr><th>Situation</th><th>Category</th><th>Operations</th></tr>
+    <tr><td>New employee</td><td>CREATE</td><td><code>CREATE_EMPLOYEE</code> (+ cohort add if listed)</td></tr>
+    <tr><td>No changes</td><td>SKIP_OP</td><td><code>NO_OP</code></td></tr>
+    <tr><td>Name / role change</td><td>UPDATE</td><td><code>UPDATE_EMPLOYEE</code></td></tr>
+    <tr><td>Cohort change</td><td>UPDATE</td><td><code>ADD</code> / <code>REMOVE_COHORT_MEMBERSHIP</code></td></tr>
+    <tr><td>Bad row</td><td>CORRECTION</td><td><code>NO_OP</code> + errors</td></tr>
+  </table>
+  <ul class="compact">
+    <li>CSV cohort list = <strong>desired membership</strong> (replace mode).</li>
+    <li>Email change on existing employee = <strong>error</strong>.</li>
+    <li><code>valid: true</code> only when <strong>every</strong> row is valid.</li>
+  </ul>
+
+  <h2>Design questions</h2>
+  <table>
+    <tr><th style="width:22%">Topic</th><th>Answer (today)</th></tr>
+    <tr><td>Outcome</td><td>Preview JSON only — no DB writes</td></tr>
+    <tr><td>Processing</td><td>Synchronous; parse → 2 DB reads → in-memory reconcile</td></tr>
+    <tr><td>Partial failure</td><td>Row-level; one bad row does not hide others</td></tr>
+    <tr><td>Repeat upload</td><td>Idempotency header required; not replayed yet</td></tr>
+    <tr><td>Scale (~1.5k rows)</td><td>Load employees by CSV ids; reconcile in memory</td></tr>
+    <tr><td>Cohort names</td><td>Exact match to tenant catalog</td></tr>
+    <tr><td>Cohort list</td><td>Replace mode — CSV is source of truth</td></tr>
+    <tr><td>Email</td><td>No change via CSV; globally unique in DB</td></tr>
+  </table>
+
+  <h2>Out of scope &amp; trade-offs</h2>
+  <ul class="compact">
+    <li>Not implemented: DB persistence, idempotency replay, mapper logic, <code>start_date</code> in reconcile.</li>
+    <li>Trade-offs: extension-only <code>.csv</code> check · 10 MB in code · no email format validator · read-only.</li>
+  </ul>
+
+  <div class="footer">
+    Emeritus Edge Backend · Round 2 · Sample CSVs in <code>samples/</code> · Schema in <code>SCHEMA_ROUND2.md</code>
+  </div>
+
+</body>
+</html>
